@@ -1,0 +1,437 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Tanımlamalar */
+#define MAKSIMUM_AKTS 30
+#define MINIMUM_AKTS 5
+#define ARTTIRILMIS_AKTS 45
+
+typedef enum {true, false} bool;
+typedef enum {Erkek, Kadin} Cinsiyet;
+typedef enum {Gecti, Kaldi, Yeni} DersDurumu;
+typedef enum {Onay, Ret, Beklemede, KayitYapmadi} OnayDurumu;
+
+/* Öğrenci için yapılar */
+typedef struct{char telefon[50]; char eposta[50];} Iletisim;
+typedef struct{char kod[10]; char ad[50]; char bolum[50];int sinif; int akts;} Ders;
+typedef struct{Ders ders; DersDurumu dersDurumu;} OgrenciDers;
+typedef struct{int dersSayisi; OgrenciDers* liste;} OgrenciDersListesi;
+typedef struct
+{
+    char no[10];
+    char ad[50];
+    char soyad[50];
+    char bolum[50];
+    Cinsiyet cinsiyet;
+    Iletisim iletisim;
+    int sinif;
+    float notOrtalamasi;
+    OgrenciDersListesi dersler;
+    OgrenciDersListesi alinanDersler;
+    OnayDurumu onayDurumu;
+    bool harc;
+} Ogrenci;
+
+/* Menü için fonksiyon prototipleri */
+void menu(Ogrenci**, int, Ders*, int);
+int ogrenciGirisi(Ogrenci**, int);
+/* Öğrenci için Fonksiyon Prototipleri */
+void dersSec(Ogrenci*, Ders*, int);
+/* Öğretmen için Fonksiyon Prototipleri */
+void kayitOnayla(Ogrenci**, int);
+void ogrenciListele(Ogrenci**, int);
+void ogrenciAlinanDersleriListele(Ogrenci);
+/* Dosya işlemleri için fonksiyon Prototipleri*/
+Ders* dosyadanDersHavuzuOku(int*);
+Ogrenci* dosyadanOgrenciBilgileriOku(int*, Ders*);
+
+int main() {
+    /* Ders Havuzunu oluştur */
+    Ders* dersHavuzu;
+    int dersSayisi = 0;
+    dersHavuzu = dosyadanDersHavuzuOku(&dersSayisi);
+
+    /* Öğrenci listesini öğrenci kişisel bilgileri ile oluştur. */
+    Ogrenci* ogrenciListesi;
+    int ogrenciSayisi = 0;
+    ogrenciListesi= dosyadanOgrenciBilgileriOku(&ogrenciSayisi, dersHavuzu);
+
+    while(1)
+        menu(&ogrenciListesi, ogrenciSayisi, dersHavuzu, dersSayisi);
+   return 0;
+}
+
+/* Menü fonksiyonları */
+void menu(Ogrenci** ogrenciListesi, int ogrenciSayisi, Ders* dersHavuzu, int dersSayisi)
+{
+    int kullaniciGirisi;
+    printf("\n------------------------------------------------------------------------------------\n");
+    printf("Ders kayit sistemine hos geldiniz.\n");
+    printf("1- Ogrenci olarak devam et.\n");
+    printf("2- Ogretim uyesi olarak devam et.\n");
+    printf("\nIsleminizi seciniz: ");fflush(stdin); scanf("%d", &kullaniciGirisi);
+
+    if(kullaniciGirisi == 1)
+    {
+        int index = ogrenciGirisi(ogrenciListesi, ogrenciSayisi);
+        if(index == -1) return;
+        dersSec((&(*ogrenciListesi)[index]), dersHavuzu, dersSayisi);
+    }
+    else if(kullaniciGirisi == 2)
+    {
+        kayitOnayla(ogrenciListesi,ogrenciSayisi);
+    }
+    else printf("\nGecerli bir deger giriniz. ");
+}
+
+int ogrenciGirisi(Ogrenci** ogrenciListesi, int ogrenciSayisi)
+{
+    char no[10];
+    printf("\nOgrenci no giriniz: ");
+    fflush(stdin); scanf("%s", no);
+    int i = 0;
+    for(i = 0; i<ogrenciSayisi;i++)
+    {
+        if(strcmp((*ogrenciListesi)[i].no, no) ==0 )
+        {
+            return i;
+        }
+    }
+    printf("\nBu no'ya sahip ogrenci bulunamadi.\n");
+    return -1;
+}
+
+
+/* Öğretmen için Fonksiyonlar */
+
+void kayitOnayla(Ogrenci** ogrenciListesi, int ogrenciSayisi)
+{
+    char kullaniciGirisi;
+    /* Çıkış yapana kadar öğrencileri onaylamaya devam et*/
+    while(1)
+    {
+        ogrenciListele(ogrenciListesi,ogrenciSayisi);
+        printf("\nKayit onay/ret islemi yapmak istediginiz ogrencinin indexini giriniz. ");
+        printf("\nCikis yapmak icin 'C'/'c' giriniz.");
+        printf("\nGiris: ");
+        fflush(stdin); scanf("%c", &kullaniciGirisi);
+        if(kullaniciGirisi == 'C' || kullaniciGirisi == 'c') return;
+        while((int)kullaniciGirisi-48 < 0 || (int)kullaniciGirisi-48 >= ogrenciSayisi)
+        {
+            printf("\nGecerli bir deger giriniz: "); fflush(stdin); scanf("%c", &kullaniciGirisi);
+            if(kullaniciGirisi == 'C' || kullaniciGirisi == 'c') return;
+        }
+        int index = (int)kullaniciGirisi-48;
+
+        /* Harç ödenmemişse sadece reddedilebilir. */
+        if( (*ogrenciListesi)[index].harc == false)
+        {
+            printf("\nOgrencinin harci odenmemis. Kayit onaylanamaz.\n");
+            printf("\nKaydi reddetmek icin 'R'/'r' giriniz. Geri donmek icin herhangi bir karaktere basiniz.");
+            printf("\nGiris: ");
+            fflush(stdin); scanf("%c", &kullaniciGirisi);
+            if(kullaniciGirisi == 'R' ||kullaniciGirisi == 'r') (*ogrenciListesi)[index].onayDurumu = Ret;
+        }
+        else if((*ogrenciListesi)[index].onayDurumu == KayitYapmadi)
+            printf("\nOgrencin kayit yapmamis. Islem yapilamaz.\n");
+        else
+        {
+            ogrenciAlinanDersleriListele(*(&(*ogrenciListesi)[index]));
+            printf("\nKaydi reddetmek icin 'R'/'r', onaylamak icin 'O'/'o' giriniz.");
+            printf("\nGeri donmek icin herhangi bir karaktere basiniz.");
+            printf("\nGiris: ");
+            fflush(stdin); scanf("%c", &kullaniciGirisi);
+            if(kullaniciGirisi == 'R' ||kullaniciGirisi == 'r') (*ogrenciListesi)[index].onayDurumu = Ret;
+            else if(kullaniciGirisi == 'O' ||kullaniciGirisi == 'o') (*ogrenciListesi)[index].onayDurumu = Onay;
+        }
+
+    }
+}
+
+void ogrenciListele(Ogrenci** ogrenciListesi, int ogrenciSayisi)
+{
+    Ogrenci* simdikiOgrenci;
+    printf("-------------------------------------------------------------------------------------------------------------------\n");
+    printf("%-5s\t%-15s\t%-25s%-25s%-15s\t%-15s%-15s\n","Index","Ogrenci No","Ad","Soyad","Not Ortalamasi","Onay Durumu","Harc Durumu");
+    printf("-------------------------------------------------------------------------------------------------------------------\n");
+	int i = 0;
+    for(i = 0; i<ogrenciSayisi; i++)
+    {
+        simdikiOgrenci = &(*ogrenciListesi)[i];
+        char onayDurumu[15];
+        char harcDurumu[15];
+        switch(simdikiOgrenci->onayDurumu)
+        {
+            case Onay: strcpy(onayDurumu,"Onay"); break;
+            case Ret: strcpy(onayDurumu,"Ret"); break;
+            case Beklemede: strcpy(onayDurumu,"Beklemede"); break;
+            case KayitYapmadi: strcpy(onayDurumu,"Kayit Yapmadi"); break;
+        }
+        switch(simdikiOgrenci->harc)
+        {
+            case true: strcpy(harcDurumu,"Odendi"); break;
+            case false: strcpy(harcDurumu,"Odenmedi"); break;
+        }
+        printf("%-5d\t%-15s\t%-25s%-25s%-15.2f\t%-15s%-15s\n",i,simdikiOgrenci->no,simdikiOgrenci->ad,simdikiOgrenci->soyad,
+                simdikiOgrenci->notOrtalamasi,onayDurumu,harcDurumu);
+    }
+
+}
+
+void ogrenciAlinanDersleriListele(Ogrenci ogrenci)
+{
+    char durum[15];
+    printf("\nSecilen ogrencinin aldigi dersler: \n");
+    printf("-------------------------------------------------------------------------------------------------------------------\n");
+    printf("%-5s\t%-10s\t%-50s\t%-15s\n","Index","Ders Kodu","Dersin Adi","Durumu");
+    printf("-------------------------------------------------------------------------------------------------------------------\n");
+    int i = 0;
+    for(i = 0; i<ogrenci.alinanDersler.dersSayisi; i++)
+    {
+        switch(ogrenci.alinanDersler.liste[i].dersDurumu)
+        {
+            case Gecti: strcpy(durum,"Yukseltme"); break;
+            case Kaldi: strcpy(durum,"Alttan"); break;
+            case Yeni: strcpy(durum,"Yeni"); break;
+        }
+        printf("%-5d\t%-10s\t%-50s\t%-15s\n",i,ogrenci.alinanDersler.liste[i].ders.kod,ogrenci.alinanDersler.liste[i].ders.ad,durum);
+    }
+}
+
+/* Öğrenci için Fonksiyonlar */
+
+void dersSec(Ogrenci* ogrenci, Ders* dersHavuzu, int dersSayisi)
+{
+    char kullaniciGirisi;
+    /* Ders kaydı onaylanmışsa uyar ve fonksiyondan çık. Yoksa ders seçimi yap. */
+    printf("\nSayin %s %s,", ogrenci->ad, ogrenci->soyad );
+    if(ogrenci->onayDurumu == Onay)
+    {
+        printf("\nDers kaydiniz onaylanmistir. Ders secimi yapamazsiniz.\n"); return;
+    }
+    else if(ogrenci->onayDurumu == Beklemede)
+    {
+        printf("\nDers kaydiniz onay asamasinda beklemededir.\n");
+        printf("Kaydinizi iptal edip tekrar ders secimi yapmak icin 'E'/'e' giriniz. Yoksa 'H','h' giriniz: ");
+        fflush(stdin); scanf("%c", &kullaniciGirisi);
+        while(1)
+        {
+            if(kullaniciGirisi == 'H' || kullaniciGirisi == 'h')    return;
+            else if(kullaniciGirisi == 'E' || kullaniciGirisi == 'e') break;
+            else{ printf("\nGecerli bir deger giriniz: "); fflush(stdin); scanf("%c", &kullaniciGirisi);}
+        }
+    }
+    else
+    {
+        printf("\nDers kaydiniz ret durumundadir. Ders secimi yapiniz.\n");
+    }
+    OgrenciDersListesi alinabilecekDersler;
+    alinabilecekDersler.liste = (OgrenciDers*) malloc(0);
+    alinabilecekDersler.dersSayisi = 0;
+    ogrenci->alinanDersler.dersSayisi = 0;
+    ogrenci->alinanDersler.liste = (OgrenciDers*) malloc(0);
+
+    printf("\nAlabileceginiz dersler asagida listelenmistir.\n\n");
+    printf("------------------------------------------------------------------------------------\n");
+    printf("%-5s%-10s%-50s\t%-5s\t%-10s\n","No","Ders Kodu","Dersin Adi","AKTS","Durum");
+    printf("------------------------------------------------------------------------------------\n");
+    /* Öğrencinin aldığı dersleri dolaşarak kaldığı dersleri listele ve alttan alacağı ders sayısını bul */
+    int alttanDersSayisi = 0;
+	int i = 0;
+    for(i = 0; i<ogrenci->dersler.dersSayisi; i++)
+    {
+        if(ogrenci->dersler.liste[i].dersDurumu == Kaldi)
+        {
+            printf("%-5d%-10s%-50s\t%-5d\t%-10s\n",alinabilecekDersler.dersSayisi,ogrenci->dersler.liste[i].ders.kod,ogrenci->dersler.liste[i].ders.ad,ogrenci->dersler.liste[i].ders.akts,"Kaldi");
+            alinabilecekDersler.liste = (OgrenciDers*) realloc(alinabilecekDersler.liste,sizeof(OgrenciDers)*(alinabilecekDersler.dersSayisi+1));
+            alinabilecekDersler.liste[alinabilecekDersler.dersSayisi].ders = ogrenci->dersler.liste[i].ders;
+            alinabilecekDersler.liste[alinabilecekDersler.dersSayisi++].dersDurumu = Kaldi;
+            alttanDersSayisi++;
+        }
+    }
+
+    /* Zorunlu olduğu dersleri listele */
+    int zorunluDersSayisi = 0;
+    i = 0;
+    for(i = 0; i<dersSayisi; i++)
+    {
+        if(!strcmp(dersHavuzu[i].bolum,ogrenci->bolum) && dersHavuzu[i].sinif == ogrenci->sinif)
+        {
+            printf("%-5d%-10s%-50s\t%-5d\t%-10s\n",alinabilecekDersler.dersSayisi,dersHavuzu[i].kod,dersHavuzu[i].ad,dersHavuzu[i].akts,"Zorunlu");
+            alinabilecekDersler.liste = (OgrenciDers*) realloc(alinabilecekDersler.liste,sizeof(OgrenciDers)*(alinabilecekDersler.dersSayisi+1));
+            alinabilecekDersler.liste[alinabilecekDersler.dersSayisi].ders = dersHavuzu[i];
+            alinabilecekDersler.liste[alinabilecekDersler.dersSayisi++].dersDurumu = Yeni;
+            zorunluDersSayisi++;
+        }
+    }
+    printf("------------------------------------------------------------------------------------\n");
+    /* Not ortalamasını hesapla ve alabileceği akts'yi yaz*/
+    int akts = 0;
+    int maxAkts = MAKSIMUM_AKTS;
+    if(ogrenci->notOrtalamasi >= 1.75)   maxAkts = ARTTIRILMIS_AKTS;
+    printf("Alabileceginiz maksimum AKTS\t:\t%d\nAldiginiz AKTS\t\t\t:\t%d\n",maxAkts,akts);
+    printf("\nAlmak istediginiz derslerin numaralarini giriniz.\n");
+    printf("Ders secimini bitirmek ve ogretim uyesi onayina sunmak icin 'O' veya 'o' giriniz.\n");
+    printf("------------------------------------------------------------------------------------\n");
+
+    /* Kullanici giriş ekranı */
+    while(1)
+    {
+        printf("------------------------------------------------------------------------------------\n");
+        printf("Giris: ");
+        fflush(stdin);
+        scanf("%c", &kullaniciGirisi);
+        /* Kullanıcı çıkmak istiyor mu ve onaya sunma şartlarını sağlıyor mu?*/
+        if(kullaniciGirisi == 'o' || kullaniciGirisi == 'O')
+        {
+            if(akts < MINIMUM_AKTS) printf("\nMinimum AKTS'nin altinda ders sectiniz. Ders secimine devam ediniz.\n");
+            else if(alttanDersSayisi > 0) printf("\nAlttan dersiniz bulunmaktadir. Ders secimine devam ediniz.\n");
+            else if(zorunluDersSayisi > 0 && maxAkts-akts >= 4) printf("\nZorunlu dersiniz bulunmaktadir. Ders secimine devam ediniz.\n");
+            else {ogrenci->onayDurumu = Beklemede;printf("\nDers kaydiniz ogretim uyesi onayina gonderilmistir.\n"); break;}
+        }
+        else if((int)kullaniciGirisi<48 || (int)kullaniciGirisi - 48 > alinabilecekDersler.dersSayisi-1)
+        {
+            printf("\nHata! Lutfen gecerli bir deger giriniz.\n");
+        }
+        else
+        {
+            OgrenciDers secilenDers = alinabilecekDersler.liste[(int)kullaniciGirisi - 48];
+            if(secilenDers.dersDurumu == Yeni && alttanDersSayisi > 0)
+            {
+                printf("\nLutfen oncelikle alttan aldiginiz dersleri seciniz.\n");
+            }
+            else if(akts+secilenDers.ders.akts > maxAkts)
+            {
+                printf("\nSecilebilecek maksimum AKTS sinirini geciyorsunuz.\n");
+                printf("\nLutfen baska bir ders secin veya kaydinizi onaylayin.\n");
+            }
+            else
+            {
+                /* Dersi ekle */
+                if(secilenDers.dersDurumu == Kaldi) alttanDersSayisi--;
+                else if(secilenDers.dersDurumu == Yeni) zorunluDersSayisi--;
+                ogrenci->alinanDersler.liste = (OgrenciDers*) realloc(ogrenci->alinanDersler.liste,sizeof(OgrenciDers)*(ogrenci->alinanDersler.dersSayisi+1));
+                ogrenci->alinanDersler.liste[ogrenci->alinanDersler.dersSayisi] = secilenDers;
+                ogrenci->alinanDersler.dersSayisi = ogrenci->alinanDersler.dersSayisi + 1;
+                akts+=secilenDers.ders.akts;
+                printf("Alabileceginiz maksimum AKTS\t:\t%d\nAldiginiz AKTS\t\t\t:\t%d\n",maxAkts,akts);
+            }
+        }
+    }
+}
+
+/* Dosyadan Okuma Fonksiyonları */
+
+Ders* dosyadanDersHavuzuOku(int* dersSayisi)
+{
+    Ders* dersHavuzu = (Ders*) malloc(0);
+
+    /* Dosyayı okuma modunda aç */
+    FILE *dosya  = fopen("DersHavuzu.txt", "r");
+    /* Dosya mevcut mu? */
+    if (dosya == NULL)
+    {
+      printf("Ders Havuzu Okunamadi.\n");
+      return dersHavuzu;
+    }
+
+    /* Belirli formatta okuma yap */
+
+    int veriSayisi = 0;
+    char kod[10], ad[50], bolum[50];
+    int sinif,akts;
+    while(1)
+    {
+        /* %[^,] virgüle kadar okuma yapar */
+        veriSayisi = fscanf(dosya, "%[^,],%[^,],%[^,],%d,%d\n", kod, ad, bolum, &sinif, &akts);
+        if(veriSayisi != 5) break;
+        dersHavuzu = (Ders*) realloc(dersHavuzu,sizeof(Ders)*(*dersSayisi+1));
+        strcpy(dersHavuzu[*dersSayisi].kod,kod);
+        strcpy(dersHavuzu[*dersSayisi].ad,ad);
+        strcpy(dersHavuzu[*dersSayisi].bolum,bolum);
+        dersHavuzu[*dersSayisi].akts= akts;
+        dersHavuzu[*dersSayisi].sinif = sinif;
+        *dersSayisi = *dersSayisi + 1;
+
+    }
+    fclose(dosya);
+    return dersHavuzu;
+}
+
+
+Ogrenci* dosyadanOgrenciBilgileriOku(int* ogrenciSayisi, Ders* dersHavuzu)
+{
+    Ogrenci* ogrenciListesi = (Ogrenci*) malloc(0);
+
+    /* Dosyayı okuma modunda aç */
+    FILE *dosya1  = fopen("OgrenciKisiselBilgileri.txt", "r");
+    FILE *dosya2  = fopen("OgrenciAkademikBilgileri.txt", "r");
+    /* Dosya mevcut mu? */
+    if (dosya1 == NULL ||dosya2 == NULL)
+    {
+      printf("Ogrenci Bilgileri Okunamadi.\n");
+      return ogrenciListesi;
+    }
+
+    /* Öğrenci bilgilerini oku*/
+
+    int veriSayisi1 = 0, veriSayisi2 = 0;
+    char no[10], ad[50], soyad[50], bolum[50], telefon[50], eposta[50], cinsiyet;
+    int sinif;
+    float notOrtalamasi;
+    char onayDurumu, harc, dersler[250];
+    while(1)
+    {
+        /* %[^,] virgüle kadar okuma yapar */
+        veriSayisi1 = fscanf(dosya1, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%c\n", no, ad, soyad, bolum, telefon, eposta, &cinsiyet);
+        veriSayisi2 = fscanf(dosya2, "%d,%f,%[^,],%c,%c\n", &sinif, &notOrtalamasi, dersler, &onayDurumu, &harc);
+
+        if(veriSayisi1 != 7 || veriSayisi2 != 5) break;
+        ogrenciListesi = (Ogrenci*) realloc(ogrenciListesi,sizeof(Ogrenci)*(*ogrenciSayisi+1));
+        /* Kişisel Bilgiler */
+        strcpy(ogrenciListesi[*ogrenciSayisi].no,no);
+        strcpy(ogrenciListesi[*ogrenciSayisi].ad,ad);
+        strcpy(ogrenciListesi[*ogrenciSayisi].soyad,soyad);
+        strcpy(ogrenciListesi[*ogrenciSayisi].bolum,bolum);
+        strcpy(ogrenciListesi[*ogrenciSayisi].iletisim.telefon,telefon);
+        strcpy(ogrenciListesi[*ogrenciSayisi].iletisim.eposta,eposta);
+        ogrenciListesi[*ogrenciSayisi].cinsiyet = cinsiyet == 'E' ? Erkek : Kadin;
+
+        /* Akademik bilgiler */
+        ogrenciListesi[*ogrenciSayisi].sinif = sinif;
+        ogrenciListesi[*ogrenciSayisi].notOrtalamasi = notOrtalamasi;
+        switch(onayDurumu)
+        {
+            case 'O': ogrenciListesi[*ogrenciSayisi].onayDurumu = Onay; break;
+            case 'R': ogrenciListesi[*ogrenciSayisi].onayDurumu = Ret; break;
+            case 'B': ogrenciListesi[*ogrenciSayisi].onayDurumu = Beklemede; break;
+            case 'K': ogrenciListesi[*ogrenciSayisi].onayDurumu = KayitYapmadi; break;
+        }
+        ogrenciListesi[*ogrenciSayisi].harc = harc == 'E' ? true : false;
+        ogrenciListesi[*ogrenciSayisi].dersler.liste = (OgrenciDers*) malloc(0);
+        ogrenciListesi[*ogrenciSayisi].dersler.dersSayisi = 0;
+        /* dersler stringinin içindeki ders kodlarını öğrenci derslerine ata */
+        char *ders, dersKodu[10], dersDurumu;
+        /* dersleri parçala */
+        ders = strtok(dersler, "-");
+        while (ders != NULL)
+        {
+            strncpy(dersKodu, ders, 6);
+            dersDurumu = ders[7];
+            int i = 0;
+            while(strcmp(dersKodu,dersHavuzu[i].kod) != 0) i++;     /* Ders kodunu ders havuzunda bul*/
+            OgrenciDers ogrenciDers;
+            ogrenciDers.dersDurumu = dersDurumu == 'G' ? Gecti : Kaldi;
+            ogrenciDers.ders = dersHavuzu[i];
+            ogrenciListesi[*ogrenciSayisi].dersler.liste = (OgrenciDers*) realloc(ogrenciListesi[*ogrenciSayisi].dersler.liste,sizeof(OgrenciDers)*(ogrenciListesi[*ogrenciSayisi].dersler.dersSayisi+1));
+            ogrenciListesi[*ogrenciSayisi].dersler.liste[ogrenciListesi[*ogrenciSayisi].dersler.dersSayisi++] = ogrenciDers;
+            ogrenciListesi[*ogrenciSayisi].dersler.dersSayisi++;
+            ders = strtok(NULL, "-");
+        }
+        *ogrenciSayisi = *ogrenciSayisi + 1;
+    }
+    fclose(dosya1);
+    fclose(dosya2);
+    return ogrenciListesi;
+}
