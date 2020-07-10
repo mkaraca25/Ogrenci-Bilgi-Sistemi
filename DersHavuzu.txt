@@ -1,0 +1,9 @@
+MEK104,Elektrik Devre Temelleri,Mekatronik,1,3
+MEK102,Algoritma ve Programlama II,Mekatronik,1,5
+FIZ102,Fizik II,Mekatronik,1,5
+MEK201,Diferansiyel Denklemler,Mekatronik,2,5
+MEK203,Mikroislemciler,Mekatronik,2,5
+MEK205,Elektronik I,Mekatronik,2,5
+MEK207,Statik ve Mukavement,Mekatronik,2,5
+MEK209,Olasilik ve Istatistik,Mekatronik,2,4
+MEK211,Bilgisayar Destekli Meslek Resmi,Mekatronik,2,4

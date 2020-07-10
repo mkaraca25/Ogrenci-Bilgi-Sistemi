@@ -1,0 +1,3 @@
+111111111,Omer Faruk,Ozturk,Mekatronik,05050001122,omer@gmail.com.tr,E
+222222222,Ali,Veli,Mekatronik,05055555555,veli@gmail.com.tr,E
+333333333,Ayse,Yilmaz,Mekatronik,05051112211,ayse@gmail.com.tr,K
